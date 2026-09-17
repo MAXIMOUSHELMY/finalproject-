@@ -1,7 +1,13 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
 
 function Login() {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const { login } = useAuth();
+
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -41,7 +47,7 @@ function Login() {
     return newErrors;
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
 
     const validationErrors = validateForm();
@@ -53,56 +59,46 @@ function Login() {
 
     setLoading(true);
 
-    try {
-      /*
-        Backend API will be connected here.
+    // Temporary mock login
+    // Will be replaced with Backend API later.
+    setTimeout(() => {
+      const isAdmin =
+        formData.email.toLowerCase() === "admin@store.com" &&
+        formData.password === "admin123";
 
-        Example later:
+      const userData = {
+        name: isAdmin ? "Admin" : "Customer",
+        token: isAdmin
+          ? "temporary-admin-token"
+          : "temporary-client-token",
+        role: isAdmin ? "admin" : "client",
+      };
 
-        const response = await loginUser(formData);
-
-        const { name, token, role } = response.data;
-
-        localStorage.setItem("token", token);
-        localStorage.setItem(
-          "user",
-          JSON.stringify({ name, role })
-        );
-
-        if (role === "admin") {
-          navigate("/admin");
-        } else {
-          navigate("/");
-        }
-      */
-
-      console.log("Login data:", formData);
-
-      // Temporary until Backend API is ready
-      setTimeout(() => {
-        setLoading(false);
-      }, 500);
-    } catch (error) {
-      console.error("Login failed:", error);
-
-      setErrors({
-        general: "Invalid email or password",
-      });
+      login(userData);
 
       setLoading(false);
-    }
+
+      const from = location.state?.from;
+
+      if (isAdmin) {
+        navigate(from || "/admin", { replace: true });
+      } else {
+        navigate(from || "/", { replace: true });
+      }
+    }, 700);
   };
 
   return (
     <main className="auth-page">
       <section className="auth-container">
+
         <div className="auth-header">
-          <span>Welcome Back</span>
+          <span>WELCOME BACK</span>
 
           <h1>Login</h1>
 
           <p>
-            Sign in to continue to your account.
+            Sign in to continue shopping with us.
           </p>
         </div>
 
@@ -113,12 +109,14 @@ function Login() {
         )}
 
         <form
-          onSubmit={handleSubmit}
           className="auth-form"
+          onSubmit={handleSubmit}
         >
-          {/* Email */}
+
           <div className="form-group">
-            <label htmlFor="email">Email</label>
+            <label htmlFor="email">
+              Email
+            </label>
 
             <input
               id="email"
@@ -136,9 +134,10 @@ function Login() {
             )}
           </div>
 
-          {/* Password */}
           <div className="form-group">
-            <label htmlFor="password">Password</label>
+            <label htmlFor="password">
+              Password
+            </label>
 
             <input
               id="password"
@@ -163,12 +162,16 @@ function Login() {
           >
             {loading ? "Signing In..." : "Login"}
           </button>
+
         </form>
 
         <p className="auth-footer">
           Don't have an account?{" "}
-          <Link to="/register">Create Account</Link>
+          <Link to="/register">
+            Create Account
+          </Link>
         </p>
+
       </section>
     </main>
   );

@@ -17,6 +17,7 @@ import Checkout from "../pages/Checkout/Checkout";
 import Orders from "../pages/Orders/Orders";
 import OrderDetails from "../pages/OrderDetails/OrderDetails";
 import Profile from "../pages/Profile/Profile";
+import AdminOrderDetails from "../pages/Admin/OrderDetails/OrderDetails";
 
 // =========================
 // Route Protection
@@ -151,6 +152,12 @@ function AppRoutes() {
           <Route
             path="orders"
             element={<AdminOrders />}
+          />
+
+          {/* Order Details */}
+          <Route
+            path="orders/:id"
+            element={<AdminOrderDetails />}
           />
 
           {/* Discounts */}

@@ -229,13 +229,13 @@ function AdminOrders() {
                     </td>
 
                     <td>
-                      <Link
-                        to={`/orders/${order.id}`}
-                        className="admin-action-btn edit"
-                        title="View Order"
-                      >
-                        <Eye size={16} />
-                      </Link>
+<Link
+  to={`/admin/orders/${order.id}`}
+  className="admin-action-btn edit"
+  title="View Order"
+>
+  <Eye size={16} />
+</Link>
                     </td>
 
                   </tr>

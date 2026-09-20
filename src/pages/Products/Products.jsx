@@ -1,56 +1,111 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Search, SlidersHorizontal } from "lucide-react";
 import ProductGrid from "../../components/ProductGrid/ProductGrid";
-import { featuredProducts } from "../../utils/mockData";
+import productService from "../../services/productService";
 
 function Products() {
+  const [products, setProducts] = useState([]);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All");
   const [sort, setSort] = useState("default");
 
-  const categories = [
-    "All",
-    ...new Set(featuredProducts.map((product) => product.category)),
-  ];
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
+  // =========================
+  // Fetch Products
+  // =========================
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        setLoading(true);
+        setError("");
+
+        const data = await productService.getProducts();
+
+        // Handle paged response or direct array
+        const productsData = Array.isArray(data)
+          ? data
+          : data?.items || data?.data || [];
+
+        setProducts(productsData);
+      } catch (error) {
+        console.error("Failed to fetch products:", error);
+
+        setError(
+          error.response?.data?.message ||
+            error.response?.data?.title ||
+            "Failed to load products."
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProducts();
+  }, []);
+
+  // =========================
+  // Categories
+  // =========================
+  const categories = useMemo(() => {
+    const uniqueCategories = [
+      ...new Set(
+        products
+          .map((product) => product.category?.name || product.category)
+          .filter(Boolean)
+      ),
+    ];
+
+    return ["All", ...uniqueCategories];
+  }, [products]);
+
+  // =========================
+  // Filter + Sort
+  // =========================
   const filteredProducts = useMemo(() => {
-    let products = [...featuredProducts];
+    let result = [...products];
 
     if (search.trim()) {
-      products = products.filter((product) =>
-        product.title.toLowerCase().includes(search.toLowerCase())
+      const searchValue = search.toLowerCase();
+
+      result = result.filter((product) =>
+        product.title?.toLowerCase().includes(searchValue)
       );
     }
 
     if (category !== "All") {
-      products = products.filter(
-        (product) => product.category === category
+      result = result.filter(
+        (product) =>
+          (product.category?.name || product.category) === category
       );
     }
 
     if (sort === "low") {
-      products.sort((a, b) => a.price - b.price);
+      result.sort((a, b) => a.price - b.price);
     }
 
     if (sort === "high") {
-      products.sort((a, b) => b.price - a.price);
+      result.sort((a, b) => b.price - a.price);
     }
 
     if (sort === "name") {
-      products.sort((a, b) =>
-        a.title.localeCompare(b.title)
+      result.sort((a, b) =>
+        (a.title || "").localeCompare(b.title || "")
       );
     }
 
-    return products;
-  }, [search, category, sort]);
+    return result;
+  }, [products, search, category, sort]);
 
   return (
     <main className="products-page">
 
       <section className="products-header">
         <div>
-          <span className="section-label">OUR COLLECTION</span>
+          <span className="section-label">
+            OUR COLLECTION
+          </span>
 
           <h1>All Products</h1>
 
@@ -96,23 +151,53 @@ function Products() {
             value={sort}
             onChange={(e) => setSort(e.target.value)}
           >
-            <option value="default">Sort By</option>
-            <option value="low">Price: Low to High</option>
-            <option value="high">Price: High to Low</option>
-            <option value="name">Name: A-Z</option>
+            <option value="default">
+              Sort By
+            </option>
+
+            <option value="low">
+              Price: Low to High
+            </option>
+
+            <option value="high">
+              Price: High to Low
+            </option>
+
+            <option value="name">
+              Name: A-Z
+            </option>
           </select>
 
         </div>
 
-        {/* Products */}
-        {filteredProducts.length > 0 ? (
-          <ProductGrid products={filteredProducts} />
-        ) : (
+        {/* Loading */}
+        {loading && (
           <div className="empty-products">
-            <h2>No products found</h2>
-            <p>Try another search or category.</p>
+            <h2>Loading products...</h2>
           </div>
         )}
+
+        {/* Error */}
+        {!loading && error && (
+          <div className="empty-products">
+            <h2>Something went wrong</h2>
+            <p>{error}</p>
+          </div>
+        )}
+
+        {/* Products */}
+        {!loading &&
+          !error &&
+          (filteredProducts.length > 0 ? (
+            <ProductGrid products={filteredProducts} />
+          ) : (
+            <div className="empty-products">
+              <h2>No products found</h2>
+              <p>
+                Try another search or category.
+              </p>
+            </div>
+          ))}
 
       </section>
 

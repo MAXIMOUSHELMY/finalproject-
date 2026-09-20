@@ -2,23 +2,96 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, Package } from "lucide-react";
 
+import orderService from "../../services/orderService";
+import { useAuth } from "../../context/AuthContext";
+
 function OrderDetails() {
   const { id } = useParams();
+  const { isAuthenticated } = useAuth();
 
   const [order, setOrder] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [canceling, setCanceling] = useState(false);
+  const [error, setError] = useState("");
 
+  //  
+  // Fetch Orders
+  //  
   useEffect(() => {
-    const orders = JSON.parse(
-      localStorage.getItem("orders") || "[]"
+    const fetchOrder = async () => {
+      try {
+        setLoading(true);
+        setError("");
+
+        if (!isAuthenticated) {
+          setOrder(null);
+          return;
+        }
+
+        const orders = await orderService.getOrders();
+
+        const foundOrder = orders.find(
+          (item) => item.id?.toString() === id
+        );
+
+        setOrder(foundOrder || null);
+      } catch (error) {
+        console.error(
+          "Failed to fetch order:",
+          error
+        );
+
+        setError(
+          error.response?.data?.detail ||
+            error.response?.data?.message ||
+            error.response?.data?.title ||
+            "Failed to load order."
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchOrder();
+  }, [id, isAuthenticated]);
+
+  //  
+  // Loading
+  //  
+  if (loading) {
+    return (
+      <main className="not-found-page">
+        <Package size={50} />
+
+        <h1>Loading Order...</h1>
+
+        <p>Please wait while we load your order.</p>
+      </main>
     );
+  }
 
-    const foundOrder = orders.find(
-      (item) => item.id.toString() === id
+  //  
+  // Error
+  //  
+  if (error) {
+    return (
+      <main className="not-found-page">
+        <Package size={50} />
+
+        <h1>Something Went Wrong</h1>
+
+        <p>{error}</p>
+
+        <Link to="/orders">
+          Back to Orders
+        </Link>
+      </main>
     );
+  }
 
-    setOrder(foundOrder);
-  }, [id]);
-
+  //  
+  // Order Not Found
+  //  
   if (!order) {
     return (
       <main className="not-found-page">
@@ -38,34 +111,41 @@ function OrderDetails() {
   const canCancel =
     status.toLowerCase() === "pending";
 
-  const handleCancel = () => {
-    const orders = JSON.parse(
-      localStorage.getItem("orders") || "[]"
-    );
+  // Cancel Order
+  const handleCancel = async () => {
+    if (canceling || !canCancel) return;
 
-    const updatedOrders = orders.map((item) =>
-      item.id.toString() === id
-        ? {
-            ...item,
-            status: "Canceled",
-          }
-        : item
-    );
+    try {
+      setCanceling(true);
+      setError("");
 
-    localStorage.setItem(
-      "orders",
-      JSON.stringify(updatedOrders)
-    );
+      await orderService.cancelOrder(order.id);
 
-    setOrder({
-      ...order,
-      status: "Canceled",
-    });
+      setOrder((prev) => ({
+        ...prev,
+        status: "Canceled",
+      }));
+    } catch (error) {
+      console.error(
+        "Failed to cancel order:",
+        error
+      );
+
+      setError(
+        error.response?.data?.detail ||
+          error.response?.data?.message ||
+          error.response?.data?.title ||
+          "Failed to cancel order."
+      );
+    } finally {
+      setCanceling(false);
+    }
   };
 
   return (
     <main className="order-details-page">
 
+      {/* Back */}
       <Link
         to="/orders"
         className="back-link"
@@ -74,6 +154,7 @@ function OrderDetails() {
         Back to Orders
       </Link>
 
+      {/* Header */}
       <div className="order-details-header">
 
         <div>
@@ -87,7 +168,11 @@ function OrderDetails() {
 
           <p>
             Placed on{" "}
-            {order.createdAt || "Recently"}
+            {order.createdAt
+              ? new Date(
+                  order.createdAt
+                ).toLocaleDateString()
+              : "Recently"}
           </p>
         </div>
 
@@ -99,48 +184,88 @@ function OrderDetails() {
 
       </div>
 
+      {error && (
+        <div className="checkout-error">
+          {error}
+        </div>
+      )}
+
       <section className="order-details-layout">
 
-        {/* Items */}
+        {/*  
+            Order Content
+          */}
         <div className="order-details-content">
 
+          {/* Items */}
           <div className="order-detail-box">
 
             <h2>Order Items</h2>
 
             <div className="order-products">
 
-              {(order.items || []).map((item, index) => (
-                <div
-                  className="order-product"
-                  key={item.id || index}
-                >
+              {(order.items || []).map(
+                (item, index) => {
 
-                  <img
-                    src={item.featured_image}
-                    alt={item.title}
-                  />
+                  const image =
+                    item.featuredImage ||
+                    item.featured_image ||
+                    item.image;
 
-                  <div className="order-product-info">
+                  const unitPrice =
+                    Number(
+                      item.unitPrice || 0
+                    );
 
-                    <h3>{item.title}</h3>
+                  const quantity =
+                    Number(
+                      item.quantity || 0
+                    );
 
-                    <span>
-                      Quantity: {item.quantity}
-                    </span>
+                  return (
+                    <div
+                      className="order-product"
+                      key={
+                        item.id ||
+                        item.productId ||
+                        index
+                      }
+                    >
 
-                  </div>
+                      <img
+                        src={image}
+                        alt={item.title}
+                      />
 
-                  <strong>
-                    $
-                    {(
-                      Number(item.price) *
-                      Number(item.quantity)
-                    ).toFixed(2)}
-                  </strong>
+                      <div className="order-product-info">
 
-                </div>
-              ))}
+                        <h3>
+                          {item.title}
+                        </h3>
+
+                        <span>
+                          Quantity: {quantity}
+                        </span>
+
+                        <span>
+                          Unit Price: $
+                          {unitPrice.toFixed(2)}
+                        </span>
+
+                      </div>
+
+                      <strong>
+                        $
+                        {(
+                          unitPrice *
+                          quantity
+                        ).toFixed(2)}
+                      </strong>
+
+                    </div>
+                  );
+                }
+              )}
 
             </div>
 
@@ -172,40 +297,59 @@ function OrderDetails() {
 
         </div>
 
-        {/* Summary */}
+        {/*  
+            Summary
+          */}
         <aside className="order-summary-box">
 
           <h2>Order Summary</h2>
 
           <div className="summary-row">
+
             <span>Subtotal</span>
 
             <span>
-              ${Number(order.total || 0).toFixed(2)}
+              $
+              {Number(
+                order.total || 0
+              ).toFixed(2)}
             </span>
+
           </div>
 
           <div className="summary-row">
+
             <span>Shipping</span>
+
             <span>Free</span>
+
           </div>
 
           <div className="summary-divider" />
 
           <div className="summary-total">
+
             <span>Total</span>
 
             <strong>
-              ${Number(order.total || 0).toFixed(2)}
+              $
+              {Number(
+                order.total || 0
+              ).toFixed(2)}
             </strong>
+
           </div>
 
+          {/* Cancel */}
           {canCancel && (
             <button
               className="cancel-order-button"
               onClick={handleCancel}
+              disabled={canceling}
             >
-              Cancel Order
+              {canceling
+                ? "Canceling..."
+                : "Cancel Order"}
             </button>
           )}
 

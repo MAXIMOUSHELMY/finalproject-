@@ -1,35 +1,89 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
+import orderService from "../../services/orderService";
+import cartService from "../../services/cartService";
+import { useAuth } from "../../context/AuthContext";
+
 function Checkout() {
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
 
   const [cart, setCart] = useState([]);
   const [address, setAddress] = useState("");
   const [paymentMethod] = useState("COD");
+
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+   
+  // Fetch Cart
+   
   useEffect(() => {
-    const savedCart = JSON.parse(
-      localStorage.getItem("cart") || "[]"
+    const fetchCart = async () => {
+      try {
+        if (isAuthenticated) {
+          const data = await cartService.getCart();
+
+          setCart(data?.items || []);
+        } else {
+          const savedCart = JSON.parse(
+            localStorage.getItem("cart") || "[]"
+          );
+
+          setCart(savedCart);
+        }
+      } catch (error) {
+        console.error(
+          "Failed to fetch cart:",
+          error
+        );
+
+        setError(
+          error.response?.data?.detail ||
+            error.response?.data?.message ||
+            "Failed to load your cart."
+        );
+      }
+    };
+
+    fetchCart();
+  }, [isAuthenticated]);
+
+   
+  // Calculate Total
+   
+  const subtotal = cart.reduce((total, item) => {
+    const price =
+      Number(
+        item.unitPrice ??
+          item.price ??
+          0
+      );
+
+    return (
+      total +
+      price * Number(item.quantity || 0)
     );
-
-    setCart(savedCart);
-  }, []);
-
-  const subtotal = cart.reduce(
-    (total, item) => total + item.price * item.quantity,
-    0
-  );
+  }, 0);
 
   const shipping = 0;
   const total = subtotal + shipping;
 
+   
+  // Create Order
+   
   const handleSubmit = async (e) => {
     e.preventDefault();
 
     setError("");
+
+    if (!isAuthenticated) {
+      setError(
+        "Please login before placing an order."
+      );
+      return;
+    }
 
     if (cart.length === 0) {
       setError("Your cart is empty.");
@@ -37,62 +91,69 @@ function Checkout() {
     }
 
     if (!address.trim()) {
-      setError("Please enter your shipping address.");
+      setError(
+        "Please enter your shipping address."
+      );
       return;
     }
 
-    setLoading(true);
-
     try {
-      /*
-        Backend checkout will be connected here.
+      setLoading(true);
 
-        Example later:
-
-        const response = await checkout({
-          products: cart,
-          address,
-          paymentMethod: "COD"
-        });
-
-        After successful checkout:
-        localStorage.removeItem("cart");
-        navigate("/orders");
-      */
-
-      console.log("Checkout data:", {
-        products: cart,
-        address,
+      await orderService.createOrder({
+        shippingAddress: address.trim(),
         paymentMethod,
-        total,
       });
 
-      // Temporary until Backend API is ready
-      setTimeout(() => {
+      /*
+        The backend creates the order from
+        the authenticated user's cart.
+      */
+
+      try {
+        const latestCart =
+          await cartService.getCart();
+
+        if (
+          !latestCart?.items ||
+          latestCart.items.length === 0
+        ) {
+          localStorage.removeItem("cart");
+        }
+      } catch {
         localStorage.removeItem("cart");
-        setLoading(false);
+      }
 
-        navigate("/orders");
-      }, 700);
-    } catch (err) {
-      console.error("Checkout failed:", err);
-
-      setError(
-        "Something went wrong while creating your order."
+      navigate("/orders");
+    } catch (error) {
+      console.error(
+        "Checkout failed:",
+        error
       );
 
+      setError(
+        error.response?.data?.detail ||
+          error.response?.data?.message ||
+          error.response?.data?.title ||
+          "Something went wrong while creating your order."
+      );
+    } finally {
       setLoading(false);
     }
   };
 
-  if (cart.length === 0) {
+   
+  // Empty Cart
+   
+  if (cart.length === 0 && !error) {
     return (
       <main className="checkout-page">
         <div className="empty-checkout">
           <h1>Your Cart is Empty</h1>
 
           <p>
-            Add some products before proceeding to checkout.
+            Add some products before proceeding
+            to checkout.
           </p>
 
           <Link to="/products">
@@ -114,8 +175,8 @@ function Checkout() {
         <h1>Complete Your Order</h1>
 
         <p>
-          Enter your shipping information and choose your
-          payment method.
+          Enter your shipping information and
+          choose your payment method.
         </p>
       </div>
 
@@ -149,6 +210,7 @@ function Checkout() {
 
           </div>
 
+          {/* Payment */}
           <div className="checkout-section">
 
             <h2>Payment Method</h2>
@@ -161,7 +223,9 @@ function Checkout() {
               />
 
               <div>
-                <strong>Cash on Delivery</strong>
+                <strong>
+                  Cash on Delivery
+                </strong>
 
                 <span>
                   Pay when your order arrives.
@@ -171,12 +235,14 @@ function Checkout() {
 
           </div>
 
+          {/* Error */}
           {error && (
             <div className="checkout-error">
               {error}
             </div>
           )}
 
+          {/* Submit */}
           <button
             type="submit"
             className="place-order-button"
@@ -196,32 +262,54 @@ function Checkout() {
 
           <div className="checkout-items">
 
-            {cart.map((item) => (
-              <div
-                className="checkout-item"
-                key={item.id}
-              >
-                <img
-                  src={item.featured_image}
-                  alt={item.title}
-                />
+            {cart.map((item) => {
+              const price = Number(
+                item.unitPrice ??
+                  item.price ??
+                  0
+              );
 
-                <div>
-                  <h3>{item.title}</h3>
+              const image =
+                item.featuredImage ||
+                item.featured_image ||
+                item.image;
 
-                  <span>
-                    Qty: {item.quantity}
-                  </span>
+              return (
+                <div
+                  className="checkout-item"
+                  key={
+                    item.id ||
+                    item.productId
+                  }
+                >
+                  <img
+                    src={image}
+                    alt={item.title}
+                  />
+
+                  <div>
+                    <h3>
+                      {item.title}
+                    </h3>
+
+                    <span>
+                      Qty:{" "}
+                      {item.quantity}
+                    </span>
+                  </div>
+
+                  <strong>
+                    $
+                    {(
+                      price *
+                      Number(
+                        item.quantity || 0
+                      )
+                    ).toFixed(2)}
+                  </strong>
                 </div>
-
-                <strong>
-                  $
-                  {(item.price * item.quantity).toFixed(
-                    2
-                  )}
-                </strong>
-              </div>
-            ))}
+              );
+            })}
 
           </div>
 
@@ -229,11 +317,15 @@ function Checkout() {
 
           <div className="summary-row">
             <span>Subtotal</span>
-            <span>${subtotal.toFixed(2)}</span>
+
+            <span>
+              ${subtotal.toFixed(2)}
+            </span>
           </div>
 
           <div className="summary-row">
             <span>Shipping</span>
+
             <span>Free</span>
           </div>
 
@@ -241,7 +333,10 @@ function Checkout() {
 
           <div className="summary-total">
             <span>Total</span>
-            <strong>${total.toFixed(2)}</strong>
+
+            <strong>
+              ${total.toFixed(2)}
+            </strong>
           </div>
 
         </aside>

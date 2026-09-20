@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import authService from "../../services/authService";
 
 function Register() {
   const navigate = useNavigate();
@@ -66,28 +67,35 @@ function Register() {
     }
 
     setLoading(true);
+    setErrors({});
 
     try {
-      // Temporary until Backend API is ready
-      console.log("Register data:", formData);
+      // Send registration data to backend
+      await authService.register(formData);
 
-      setTimeout(() => {
-        setLoading(false);
-
-        // After successful registration
-        navigate("/verify-otp", {
-          state: {
-            email: formData.email,
-          },
-        });
-      }, 500);
+      // Backend accepted registration
+      // User now needs to verify OTP
+      navigate("/verify-otp", {
+        state: {
+          email: formData.email,
+        },
+      });
     } catch (error) {
       console.error("Registration failed:", error);
 
-      setErrors({
-        general: "Something went wrong. Please try again.",
-      });
+      const message =
+        error.response?.data?.message ||
+        error.response?.data?.title ||
+        error.response?.data ||
+        "Registration failed. Please try again.";
 
+      setErrors({
+        general:
+          typeof message === "string"
+            ? message
+            : "Registration failed. Please try again.",
+      });
+    } finally {
       setLoading(false);
     }
   };
@@ -211,7 +219,9 @@ function Register() {
             className="auth-button"
             disabled={loading}
           >
-            {loading ? "Creating Account..." : "Create Account"}
+            {loading
+              ? "Creating Account..."
+              : "Create Account"}
           </button>
 
         </form>

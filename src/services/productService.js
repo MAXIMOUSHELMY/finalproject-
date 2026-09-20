@@ -1,10 +1,16 @@
 import api from "./api";
 
 const productService = {
+  // =========================
+  // Public Products
+  // =========================
+
   getProducts: async (params = {}) => {
     const response = await api.get(
-      "/products",
-      { params }
+      "/api/products",
+      {
+        params,
+      }
     );
 
     return response.data;
@@ -12,15 +18,25 @@ const productService = {
 
   getProductById: async (id) => {
     const response = await api.get(
-      `/products/${id}`
+      `/api/products/${id}`
     );
 
     return response.data;
   },
 
+
+getAdminProducts: async (params = {}) => {
+  const response = await api.get(
+    "/api/admin/products",
+    { params }
+  );
+
+  return response.data;
+},
+
   createProduct: async (productData) => {
     const response = await api.post(
-      "/products",
+      "/api/admin/products",
       productData
     );
 
@@ -29,7 +45,7 @@ const productService = {
 
   updateProduct: async (id, productData) => {
     const response = await api.put(
-      `/products/${id}`,
+      `/api/admin/products/${id}`,
       productData
     );
 
@@ -38,7 +54,7 @@ const productService = {
 
   deleteProduct: async (id) => {
     const response = await api.delete(
-      `/products/${id}`
+      `/api/admin/products/${id}`
     );
 
     return response.data;

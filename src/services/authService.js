@@ -1,38 +1,31 @@
 import api from "./api";
 
 const authService = {
-  login: async (credentials) => {
-    const response = await api.post(
-      "/login",
-      credentials
-    );
-
-    return response.data;
-  },
-
   register: async (userData) => {
-    const response = await api.post(
-      "/signup",
-      userData
-    );
+    const response = await api.post("/api/Auth/register", {
+      name: userData.name,
+      email: userData.email,
+      password: userData.password,
+      address: userData.address,
+    });
 
     return response.data;
   },
 
-  verifyOTP: async (data) => {
-    const response = await api.post(
-      "/verify-signup",
-      data
-    );
+  verifyOTP: async ({ email, otp }) => {
+    const response = await api.post("/api/Auth/verify-otp", {
+      email,
+      otp,
+    });
 
     return response.data;
   },
 
-  updateAddress: async (data) => {
-    const response = await api.put(
-      "/address",
-      data
-    );
+  login: async ({ email, password }) => {
+    const response = await api.post("/api/Auth/login", {
+      email,
+      password,
+    });
 
     return response.data;
   },

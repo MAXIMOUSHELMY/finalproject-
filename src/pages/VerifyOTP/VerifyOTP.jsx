@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import authService from "../../services/authService";
 
 function VerifyOTP() {
   const navigate = useNavigate();
@@ -16,6 +17,11 @@ function VerifyOTP() {
 
     setError("");
 
+    if (!email) {
+      setError("Email is missing. Please register again.");
+      return;
+    }
+
     if (!otp.trim()) {
       setError("Please enter the OTP.");
       return;
@@ -28,19 +34,31 @@ function VerifyOTP() {
 
     setLoading(true);
 
-    // TODO:
-    // Later connect this with the backend
-    // verifySignup({ otp, email })
+    try {
+      await authService.verifyOTP({
+        email,
+        otp,
+      });
 
-    console.log({
-      email,
-      otp,
-    });
+      navigate("/login", {
+        replace: true,
+      });
+    } catch (error) {
+      console.error("OTP verification failed:", error);
 
-    setTimeout(() => {
+      const message =
+        error.response?.data?.message ||
+        error.response?.data?.title ||
+        "Invalid or expired OTP. Please try again.";
+
+      setError(
+        typeof message === "string"
+          ? message
+          : "Invalid or expired OTP. Please try again."
+      );
+    } finally {
       setLoading(false);
-      navigate("/login");
-    }, 1000);
+    }
   };
 
   return (
@@ -49,6 +67,7 @@ function VerifyOTP() {
 
         <div className="auth-header">
           <h1>Verify Your Email</h1>
+
           <p>
             Enter the 6-digit OTP sent to your email.
           </p>
@@ -63,7 +82,9 @@ function VerifyOTP() {
         <form onSubmit={handleSubmit} className="auth-form">
 
           <div className="form-group">
-            <label htmlFor="otp">OTP</label>
+            <label htmlFor="otp">
+              OTP
+            </label>
 
             <input
               id="otp"

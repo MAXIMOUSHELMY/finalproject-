@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import authService from "../../services/authService";
 
 function Login() {
   const navigate = useNavigate();
@@ -47,7 +48,7 @@ function Login() {
     return newErrors;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     const validationErrors = validateForm();
@@ -58,34 +59,42 @@ function Login() {
     }
 
     setLoading(true);
+    setErrors({});
 
-    // Temporary mock login
-    // Will be replaced with Backend API later.
-    setTimeout(() => {
-      const isAdmin =
-        formData.email.toLowerCase() === "admin@store.com" &&
-        formData.password === "admin123";
+    try {
+      const response = await authService.login({
+        email: formData.email,
+        password: formData.password,
+      });
 
-      const userData = {
-        name: isAdmin ? "Admin" : "Customer",
-        token: isAdmin
-          ? "temporary-admin-token"
-          : "temporary-client-token",
-        role: isAdmin ? "admin" : "client",
-      };
+      console.log("Login response:", response);
 
-      login(userData);
-
-      setLoading(false);
+      login(response);
 
       const from = location.state?.from;
 
-      if (isAdmin) {
+      if (response.role === "admin") {
         navigate(from || "/admin", { replace: true });
       } else {
         navigate(from || "/", { replace: true });
       }
-    }, 700);
+    } catch (error) {
+      console.error("Login failed:", error);
+
+      const message =
+        error.response?.data?.message ||
+        error.response?.data?.title ||
+        "Invalid email or password.";
+
+      setErrors({
+        general:
+          typeof message === "string"
+            ? message
+            : "Invalid email or password.",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -112,7 +121,6 @@ function Login() {
           className="auth-form"
           onSubmit={handleSubmit}
         >
-
           <div className="form-group">
             <label htmlFor="email">
               Email
@@ -162,7 +170,6 @@ function Login() {
           >
             {loading ? "Signing In..." : "Login"}
           </button>
-
         </form>
 
         <p className="auth-footer">

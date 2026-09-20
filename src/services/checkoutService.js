@@ -1,19 +1,13 @@
 import api from "./api";
 
 const checkoutService = {
-  checkout: async (checkoutData) => {
+  // =========================
+  // Create Order / Checkout
+  // =========================
+  createOrder: async (orderData) => {
     const response = await api.post(
-      "/checkout",
-      checkoutData
-    );
-
-    return response.data;
-  },
-
-  confirmPayment: async (paymentData) => {
-    const response = await api.post(
-      "/payment",
-      paymentData
+      "/api/orders",
+      orderData
     );
 
     return response.data;

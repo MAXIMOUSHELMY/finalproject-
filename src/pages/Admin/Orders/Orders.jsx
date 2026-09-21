@@ -1,100 +1,182 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Search, Eye, ShoppingBag } from "lucide-react";
 import { Link } from "react-router-dom";
+import toast from "react-hot-toast";
+
+import orderService from "../../../services/orderService";
 
 function AdminOrders() {
-  const [orders, setOrders] = useState([
-    {
-      id: "ORD-1001",
-      client_id: 25,
-      customer: "Ahmed Mohamed",
-      items: 3,
-      total: 149.99,
-      status: "Pending",
-      paymentMethod: "COD",
-      shippingAddress: "Zagazig, Egypt",
-      createdAt: "2026-09-15",
-    },
-    {
-      id: "ORD-1002",
-      client_id: 31,
-      customer: "Mohamed Ali",
-      items: 2,
-      total: 89.99,
-      status: "Shipped",
-      paymentMethod: "COD",
-      shippingAddress: "Cairo, Egypt",
-      createdAt: "2026-09-14",
-    },
-    {
-      id: "ORD-1003",
-      client_id: 17,
-      customer: "Omar Hassan",
-      items: 1,
-      total: 249.99,
-      status: "Delivered",
-      paymentMethod: "COD",
-      shippingAddress: "Alexandria, Egypt",
-      createdAt: "2026-09-13",
-    },
-    {
-      id: "ORD-1004",
-      client_id: 42,
-      customer: "Karim Adel",
-      items: 4,
-      total: 319.99,
-      status: "Canceled",
-      paymentMethod: "COD",
-      shippingAddress: "Giza, Egypt",
-      createdAt: "2026-09-12",
-    },
-  ]);
+  const [orders, setOrders] = useState([]);
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
 
+  const [loading, setLoading] = useState(true);
+  const [updatingId, setUpdatingId] = useState(null);
+
+  // =========================
+  // Fetch Orders
+  // =========================
+
+  useEffect(() => {
+    const fetchOrders = async () => {
+      try {
+        setLoading(true);
+
+        const data = await orderService.getAdminOrders();
+
+        setOrders(
+          Array.isArray(data)
+            ? data
+            : []
+        );
+      } catch (error) {
+        console.error(
+          "Failed to fetch admin orders:",
+          error
+        );
+
+        toast.error(
+          error.response?.data?.message ||
+            "Failed to load orders."
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchOrders();
+  }, []);
+
+  // =========================
+  // Filter Orders
+  // =========================
+
   const filteredOrders = useMemo(() => {
     return orders.filter((order) => {
+      const orderId =
+        String(order.id || "").toLowerCase();
+
+      const customer =
+        String(
+          order.customerName || ""
+        ).toLowerCase();
+
+      const searchValue =
+        search.toLowerCase();
+
       const matchesSearch =
-        order.id.toLowerCase().includes(search.toLowerCase()) ||
-        order.customer.toLowerCase().includes(search.toLowerCase());
+        orderId.includes(searchValue) ||
+        customer.includes(searchValue);
 
       const matchesStatus =
         statusFilter === "All" ||
         order.status === statusFilter;
 
-      return matchesSearch && matchesStatus;
+      return (
+        matchesSearch &&
+        matchesStatus
+      );
     });
-  }, [orders, search, statusFilter]);
+  }, [
+    orders,
+    search,
+    statusFilter,
+  ]);
+
+  // =========================
+  // Available Statuses
+  // =========================
 
   const getNextStatuses = (status) => {
     if (status === "Pending") {
-      return ["Pending", "Shipped", "Canceled"];
+      return [
+        "Pending",
+        "Shipped",
+        "Canceled",
+      ];
     }
 
     if (status === "Shipped") {
-      return ["Shipped", "Delivered"];
+      return [
+        "Shipped",
+        "Delivered",
+      ];
     }
 
     return [status];
   };
 
-  const handleStatusChange = (id, newStatus) => {
-    setOrders((prev) =>
-      prev.map((order) =>
-        order.id === id
-          ? { ...order, status: newStatus }
-          : order
-      )
-    );
+  // =========================
+  // Update Status
+  // =========================
+
+  const handleStatusChange = async (
+    id,
+    newStatus
+  ) => {
+    try {
+      setUpdatingId(id);
+
+      await orderService.updateOrderStatus(
+        id,
+        newStatus
+      );
+
+      setOrders((prev) =>
+        prev.map((order) =>
+          order.id === id
+            ? {
+                ...order,
+                status: newStatus,
+              }
+            : order
+        )
+      );
+
+      toast.success(
+        "Order status updated successfully."
+      );
+    } catch (error) {
+      console.error(
+        "Failed to update order status:",
+        error
+      );
+
+      toast.error(
+        error.response?.data?.detail ||
+          error.response?.data?.message ||
+          "Failed to update order status."
+      );
+    } finally {
+      setUpdatingId(null);
+    }
   };
+
+  // =========================
+  // Loading
+  // =========================
+
+  if (loading) {
+    return (
+      <div className="admin-empty-state">
+        <h2>Loading Orders...</h2>
+
+        <p>
+          Please wait while we load customer orders.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="admin-orders-page">
 
       {/* Header */}
+
       <div className="admin-page-header">
         <div>
+
           <span className="admin-page-label">
             MANAGEMENT
           </span>
@@ -104,13 +186,16 @@ function AdminOrders() {
           <p>
             View and manage customer orders.
           </p>
+
         </div>
       </div>
 
       {/* Toolbar */}
+
       <div className="admin-products-toolbar">
 
         <div className="admin-search-box">
+
           <Search size={18} />
 
           <input
@@ -121,6 +206,7 @@ function AdminOrders() {
               setSearch(e.target.value)
             }
           />
+
         </div>
 
         <select
@@ -130,22 +216,41 @@ function AdminOrders() {
             setStatusFilter(e.target.value)
           }
         >
-          <option value="All">All Status</option>
-          <option value="Pending">Pending</option>
-          <option value="Shipped">Shipped</option>
-          <option value="Delivered">Delivered</option>
-          <option value="Canceled">Canceled</option>
+
+          <option value="All">
+            All Status
+          </option>
+
+          <option value="Pending">
+            Pending
+          </option>
+
+          <option value="Shipped">
+            Shipped
+          </option>
+
+          <option value="Delivered">
+            Delivered
+          </option>
+
+          <option value="Canceled">
+            Canceled
+          </option>
+
         </select>
 
       </div>
 
       {/* Orders Table */}
+
       <div className="admin-table-wrapper">
 
         {filteredOrders.length > 0 ? (
+
           <table className="admin-table">
 
             <thead>
+
               <tr>
                 <th>Order</th>
                 <th>Customer</th>
@@ -155,58 +260,112 @@ function AdminOrders() {
                 <th>Status</th>
                 <th>View</th>
               </tr>
+
             </thead>
 
             <tbody>
+
               {filteredOrders.map((order) => {
 
                 const availableStatuses =
-                  getNextStatuses(order.status);
+                  getNextStatuses(
+                    order.status
+                  );
 
                 return (
                   <tr key={order.id}>
 
-                    <td>
-                      <div className="admin-order-id">
-                        <strong>{order.id}</strong>
-                        <span>{order.createdAt}</span>
-                      </div>
-                    </td>
+                    {/* Order */}
 
                     <td>
-                      <div className="admin-customer-cell">
+
+                      <div className="admin-order-id">
+
                         <strong>
-                          {order.customer}
+                          {order.id}
                         </strong>
 
                         <span>
-                          Client #{order.client_id}
+                          {order.createdAt
+                            ? new Date(
+                                order.createdAt
+                              ).toLocaleDateString()
+                            : "-"}
                         </span>
+
                       </div>
+
                     </td>
 
-                    <td>
-                      {order.items}
-                    </td>
+                    {/* Customer */}
 
                     <td>
+
+                      <div className="admin-customer-cell">
+
+                        <strong>
+                          {order.customerName ||
+                            "Unknown Customer"}
+                        </strong>
+
+                        <span>
+                          Client #{order.clientId}
+                        </span>
+
+                      </div>
+
+                    </td>
+
+                    {/* Items */}
+
+                    <td>
+                      {Array.isArray(
+                        order.items
+                      )
+                        ? order.items.length
+                        : 0}
+                    </td>
+
+                    {/* Total */}
+
+                    <td>
+
                       <strong>
-                        ${order.total.toFixed(2)}
+                        $
+                        {Number(
+                          order.total || 0
+                        ).toFixed(2)}
                       </strong>
+
                     </td>
 
+                    {/* Payment */}
+
                     <td>
+
                       <span className="admin-category-badge">
-                        {order.paymentMethod}
+                        {order.paymentMethod ||
+                          "-"}
                       </span>
+
                     </td>
 
+                    {/* Status */}
+
                     <td>
+
                       <select
-                        className={`admin-order-status-select ${order.status.toLowerCase()}`}
-                        value={order.status}
+                        className={`admin-order-status-select ${String(
+                          order.status || ""
+                        ).toLowerCase()}`}
+                        value={
+                          order.status || ""
+                        }
                         disabled={
-                          availableStatuses.length === 1
+                          availableStatuses.length ===
+                            1 ||
+                          updatingId ===
+                            order.id
                         }
                         onChange={(e) =>
                           handleStatusChange(
@@ -215,6 +374,7 @@ function AdminOrders() {
                           )
                         }
                       >
+
                         {availableStatuses.map(
                           (status) => (
                             <option
@@ -225,35 +385,51 @@ function AdminOrders() {
                             </option>
                           )
                         )}
+
                       </select>
+
                     </td>
 
+                    {/* View */}
+
                     <td>
-<Link
-  to={`/admin/orders/${order.id}`}
-  className="admin-action-btn edit"
-  title="View Order"
->
-  <Eye size={16} />
-</Link>
+
+                      <Link
+                        to={`/admin/orders/${order.id}`}
+                        className="admin-action-btn edit"
+                        title="View Order"
+                      >
+                        <Eye size={16} />
+                      </Link>
+
                     </td>
 
                   </tr>
                 );
               })}
+
             </tbody>
 
           </table>
+
         ) : (
+
           <div className="admin-empty-state">
+
             <ShoppingBag size={42} />
 
-            <h2>No Orders Found</h2>
+            <h2>
+              No Orders Found
+            </h2>
 
             <p>
-              Try another search or status filter.
+              {orders.length === 0
+                ? "There are no customer orders yet."
+                : "Try another search or status filter."}
             </p>
+
           </div>
+
         )}
 
       </div>

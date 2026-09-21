@@ -40,11 +40,11 @@ const orderService = {
     return response.data;
   },
 
-  updateOrderStatus: async (id, newStatus) => {
+  updateOrderStatus: async (id, status) => {
     const response = await api.put(
       `/api/admin/orders/${id}/status`,
       {
-        new_status: newStatus,
+        status,
       }
     );
 

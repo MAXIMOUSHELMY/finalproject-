@@ -41,9 +41,7 @@ function AppRoutes() {
   return (
     <Routes>
 
-      {/* =========================
-          PUBLIC WEBSITE
-      ========================= */}
+      {/*PUBLIC WEBSITE*/}
 
       <Route path="/" element={<Home />} />
 
@@ -73,9 +71,7 @@ function AppRoutes() {
       />
 
 
-      {/* =========================
-          PROTECTED USER PAGES
-      ========================= */}
+      {/*PROTECTED USER PAGES*/}
 
       <Route element={<ProtectedRoute />}>
 
@@ -107,9 +103,7 @@ function AppRoutes() {
       </Route>
 
 
-      {/* =========================
-          PROTECTED ADMIN PANEL
-      ========================= */}
+      {/*PROTECTED ADMIN PANEL*/}
 
       <Route element={<AdminProtectedRoute />}>
 

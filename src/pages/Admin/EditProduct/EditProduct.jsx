@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -6,93 +6,289 @@ import {
   Save,
   X,
 } from "lucide-react";
-import { featuredProducts } from "../../../utils/mockData";
+import toast from "react-hot-toast";
+
+import categoryService from "../../../services/categoryService";
+import productService from "../../../services/productService";
 
 function EditProduct() {
   const { id } = useParams();
   const navigate = useNavigate();
 
-  const product = featuredProducts.find(
-    (item) => String(item.id) === String(id)
-  );
-
   const [formData, setFormData] = useState({
-    title: product?.title || "",
-    description: product?.description || "",
-    price: product?.price || "",
-    stock: product?.stock || "",
-    category: product?.category || "",
-    featured_image: product?.featured_image || "",
-    is_virtual: product?.is_virtual || false,
+    title: "",
+    description: "",
+    price: "",
+    stock: "",
+    categoryId: "",
+    isVirtual: false,
   });
 
-  const [media, setMedia] = useState(
-    product?.media?.length
-      ? product.media
-      : [""]
-  );
+  const [categories, setCategories] = useState([]);
 
-  const categories = [
-    "Electronics",
-    "Fashion",
-    "Sports",
-    "Accessories",
-    "Home",
-  ];
+  const [existingImages, setExistingImages] = useState([]);
+  const [removedImageIds, setRemovedImageIds] = useState([]);
+
+  const [newImages, setNewImages] = useState([]);
+
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+ 
+  // Fetch Product + Categories
+ 
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        setError("");
+
+        const [product, categoriesData] =
+          await Promise.all([
+            productService.getAdminProductById(id),
+            categoryService.getCategories(),
+          ]);
+
+        setFormData({
+          title: product.title || "",
+          description: product.description || "",
+          price: product.price ?? "",
+          stock: product.stock ?? "",
+          categoryId: product.categoryId || "",
+          isVirtual: product.isVirtual || false,
+        });
+
+        setCategories(
+          Array.isArray(categoriesData)
+            ? categoriesData
+            : []
+        );
+
+        setExistingImages(
+          Array.isArray(product.images)
+            ? product.images
+            : []
+        );
+      } catch (error) {
+        console.error(
+          "Failed to fetch product:",
+          error
+        );
+
+        setError(
+          error.response?.data?.message ||
+            "Failed to load product."
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [id]);
+
+ 
+  // Handle Form Changes
+ 
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
 
     setFormData((prev) => ({
       ...prev,
-      [name]: type === "checkbox" ? checked : value,
+      [name]:
+        type === "checkbox"
+          ? checked
+          : value,
     }));
   };
 
-  const handleMediaChange = (index, value) => {
-    const updatedMedia = [...media];
+ 
+  // Remove Existing Image
+ 
 
-    updatedMedia[index] = value;
+  const removeExistingImage = (imageId) => {
+    setExistingImages((prev) =>
+      prev.filter((image) => image.id !== imageId)
+    );
 
-    setMedia(updatedMedia);
+    setRemovedImageIds((prev) => [
+      ...prev,
+      imageId,
+    ]);
   };
 
-  const addMediaField = () => {
-    setMedia((prev) => [...prev, ""]);
+ 
+  // Add New Images
+ 
+
+  const handleNewImagesChange = (e) => {
+    const files = Array.from(
+      e.target.files || []
+    );
+
+    setNewImages((prev) => [
+      ...prev,
+      ...files,
+    ]);
+
+    // Allow selecting same file again
+    e.target.value = "";
   };
 
-  const removeMediaField = (index) => {
-    setMedia((prev) =>
+  const removeNewImage = (index) => {
+    setNewImages((prev) =>
       prev.filter((_, i) => i !== index)
     );
   };
 
-  const handleSubmit = (e) => {
+ 
+  // Submit
+ 
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
-    const updatedProduct = {
-      id: product?.id,
-      ...formData,
-      price: Number(formData.price),
-      stock: Number(formData.stock),
-      media: media.filter(
-        (item) => item.trim() !== ""
-      ),
-    };
+    if (!formData.title.trim()) {
+      toast.error(
+        "Please enter the product title."
+      );
+      return;
+    }
 
-    console.log("Updated Product:", updatedProduct);
+    if (!formData.categoryId) {
+      toast.error(
+        "Please select a category."
+      );
+      return;
+    }
 
-    navigate("/admin/products");
+    if (formData.price === "") {
+      toast.error(
+        "Please enter the product price."
+      );
+      return;
+    }
+
+    if (formData.stock === "") {
+      toast.error(
+        "Please enter the product stock."
+      );
+      return;
+    }
+
+    try {
+      setSaving(true);
+
+      const data = new FormData();
+
+     
+      // Product Data
+     
+
+      data.append(
+        "CategoryId",
+        formData.categoryId
+      );
+
+      data.append(
+        "Title",
+        formData.title.trim()
+      );
+
+      data.append(
+        "Description",
+        formData.description.trim()
+      );
+
+      data.append(
+        "Price",
+        Number(formData.price)
+      );
+
+      data.append(
+        "Stock",
+        Number(formData.stock)
+      );
+
+      data.append(
+        "IsVirtual",
+        formData.isVirtual
+      );
+
+     
+      // Removed Images
+     
+
+      removedImageIds.forEach((imageId) => {
+        data.append(
+          "RemovedImageIds",
+          imageId
+        );
+      });
+
+     
+      // New Images
+     
+
+      newImages.forEach((file) => {
+        data.append(
+          "Images",
+          file
+        );
+      });
+
+      await productService.updateProduct(
+        id,
+        data
+      );
+
+      toast.success(
+        "Product updated successfully!"
+      );
+
+      navigate("/admin/products");
+    } catch (error) {
+      console.error(
+        "Failed to update product:",
+        error
+      );
+
+      const message =
+        error.response?.data?.message ||
+        error.response?.data?.title ||
+        "Failed to update product.";
+
+      toast.error(message);
+    } finally {
+      setSaving(false);
+    }
   };
 
-  if (!product) {
+ 
+  // Loading
+ 
+
+  if (loading) {
     return (
       <div className="admin-empty-state">
-        <h2>Product Not Found</h2>
+        <h2>Loading Product...</h2>
 
         <p>
-          The product you are trying to edit does not exist.
+          Please wait while we load the product information.
         </p>
+      </div>
+    );
+  }
+  // Error
+  if (error) {
+    return (
+      <div className="admin-empty-state">
+        <h2>Unable to Load Product</h2>
+
+        <p>{error}</p>
 
         <Link
           to="/admin/products"
@@ -108,6 +304,7 @@ function EditProduct() {
     <div className="admin-product-form-page">
 
       {/* Header */}
+
       <div className="admin-page-header">
         <div>
 
@@ -137,16 +334,21 @@ function EditProduct() {
         onSubmit={handleSubmit}
       >
 
-        {/* Basic Information */}
+        {/* =========================
+            Basic Information
+        ========================= */}
+
         <section className="admin-form-section">
 
           <div className="admin-form-section-header">
             <div>
+
               <h2>Basic Information</h2>
 
               <p>
                 Update the main information about this product.
               </p>
+
             </div>
           </div>
 
@@ -190,7 +392,10 @@ function EditProduct() {
 
         </section>
 
-        {/* Pricing & Inventory */}
+        {/* =========================
+            Pricing & Inventory
+        ========================= */}
+
         <section className="admin-form-section">
 
           <div className="admin-form-section-header">
@@ -206,6 +411,8 @@ function EditProduct() {
           </div>
 
           <div className="admin-form-grid">
+
+            {/* Price */}
 
             <div className="admin-form-group">
 
@@ -232,6 +439,8 @@ function EditProduct() {
 
             </div>
 
+            {/* Stock */}
+
             <div className="admin-form-group">
 
               <label htmlFor="stock">
@@ -250,33 +459,39 @@ function EditProduct() {
 
             </div>
 
+            {/* Category */}
+
             <div className="admin-form-group">
 
-              <label htmlFor="category">
+              <label htmlFor="categoryId">
                 Category
               </label>
 
               <select
-                id="category"
-                name="category"
-                value={formData.category}
+                id="categoryId"
+                name="categoryId"
+                value={formData.categoryId}
                 onChange={handleChange}
               >
+
                 <option value="">
                   Select category
                 </option>
 
-                {categories.map((item) => (
+                {categories.map((category) => (
                   <option
-                    key={item}
-                    value={item}
+                    key={category.id}
+                    value={category.id}
                   >
-                    {item}
+                    {category.name}
                   </option>
                 ))}
+
               </select>
 
             </div>
+
+            {/* Virtual Product */}
 
             <div className="admin-form-group admin-checkbox-group">
 
@@ -284,8 +499,8 @@ function EditProduct() {
 
                 <input
                   type="checkbox"
-                  name="is_virtual"
-                  checked={formData.is_virtual}
+                  name="isVirtual"
+                  checked={formData.isVirtual}
                   onChange={handleChange}
                 />
 
@@ -306,7 +521,10 @@ function EditProduct() {
 
         </section>
 
-        {/* Product Images */}
+        {/* =========================
+            Product Images
+        ========================= */}
+
         <section className="admin-form-section">
 
           <div className="admin-form-section-header">
@@ -315,16 +533,62 @@ function EditProduct() {
               <h2>Product Images</h2>
 
               <p>
-                Update the featured image and additional media.
+                Manage existing images and upload new ones.
               </p>
 
             </div>
           </div>
 
+          {/* Existing Images */}
+
+          {existingImages.length > 0 && (
+            <div className="admin-media-section">
+
+              <div className="admin-media-header">
+                <label>
+                  Existing Images
+                </label>
+              </div>
+
+              <div className="admin-existing-images">
+
+                {existingImages.map((image) => (
+                  <div
+                    className="admin-existing-image"
+                    key={image.id}
+                  >
+
+                    <img
+                      src={image.url}
+                      alt="Product"
+                    />
+
+                    <button
+                      type="button"
+                      className="admin-remove-media"
+                      onClick={() =>
+                        removeExistingImage(
+                          image.id
+                        )
+                      }
+                    >
+                      <X size={17} />
+                    </button>
+
+                  </div>
+                ))}
+
+              </div>
+
+            </div>
+          )}
+
+          {/* New Images */}
+
           <div className="admin-form-group full">
 
-            <label htmlFor="featured_image">
-              Featured Image URL
+            <label htmlFor="newImages">
+              Add New Images
             </label>
 
             <div className="admin-image-input">
@@ -332,74 +596,62 @@ function EditProduct() {
               <ImagePlus size={19} />
 
               <input
-                id="featured_image"
-                name="featured_image"
-                type="url"
-                placeholder="https://example.com/image.jpg"
-                value={formData.featured_image}
-                onChange={handleChange}
+                id="newImages"
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={
+                  handleNewImagesChange
+                }
               />
 
             </div>
 
           </div>
 
-          <div className="admin-media-section">
+          {/* New Image List */}
 
-            <div className="admin-media-header">
+          {newImages.length > 0 && (
+            <div className="admin-media-section">
 
-              <label>
-                Additional Media
-              </label>
+              <div className="admin-media-header">
+                <label>
+                  New Images
+                </label>
+              </div>
 
-              <button
-                type="button"
-                className="admin-secondary-btn"
-                onClick={addMediaField}
-              >
-                + Add Image
-              </button>
+              {newImages.map((file, index) => (
+                <div
+                  className="admin-media-row"
+                  key={`${file.name}-${index}`}
+                >
 
-            </div>
+                  <span>
+                    {file.name}
+                  </span>
 
-            {media.map((item, index) => (
-              <div
-                className="admin-media-row"
-                key={index}
-              >
-
-                <input
-                  type="url"
-                  placeholder={`Media image URL ${index + 1}`}
-                  value={item}
-                  onChange={(e) =>
-                    handleMediaChange(
-                      index,
-                      e.target.value
-                    )
-                  }
-                />
-
-                {media.length > 1 && (
                   <button
                     type="button"
                     className="admin-remove-media"
                     onClick={() =>
-                      removeMediaField(index)
+                      removeNewImage(index)
                     }
                   >
                     <X size={17} />
                   </button>
-                )}
 
-              </div>
-            ))}
+                </div>
+              ))}
 
-          </div>
+            </div>
+          )}
 
         </section>
 
-        {/* Actions */}
+        {/*  
+            Actions
+          */}
+
         <div className="admin-form-actions">
 
           <Link
@@ -412,9 +664,15 @@ function EditProduct() {
           <button
             type="submit"
             className="admin-primary-btn"
+            disabled={saving}
           >
+
             <Save size={18} />
-            Update Product
+
+            {saving
+              ? "Updating..."
+              : "Update Product"}
+
           </button>
 
         </div>

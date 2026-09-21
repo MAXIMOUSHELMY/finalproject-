@@ -6,7 +6,6 @@ import { Routes, Route } from "react-router-dom";
 import Home from "../pages/Home/Home";
 import Login from "../pages/Login/Login";
 import Register from "../pages/Register/Register";
-import VerifyOTP from "../pages/VerifyOTP/VerifyOTP";
 import About from "../pages/About/About";
 import Contact from "../pages/Contact/Contact";
 import Products from "../pages/Products/Products";
@@ -49,7 +48,6 @@ function AppRoutes() {
 
       <Route path="/register" element={<Register />} />
 
-      <Route path="/verify-otp" element={<VerifyOTP />} />
 
       <Route path="/about" element={<About />} />
 

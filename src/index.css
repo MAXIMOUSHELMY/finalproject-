@@ -4700,3 +4700,39 @@ button {
     gap: 10px;
   }
 }
+
+.auth-success-message {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 24px;
+  padding: 14px 16px;
+  border: 1px solid #c7ead3;
+  background: #f1fbf4;
+  border-radius: 10px;
+  color: #245b36;
+}
+
+.auth-success-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #d9f4e1;
+}
+
+.auth-success-message strong {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 14px;
+}
+
+.auth-success-message p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #4d6b57;
+}

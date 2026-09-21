@@ -15,6 +15,9 @@ function Register() {
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
 
+  // =========================
+  // Handle Input Change
+  // =========================
   const handleChange = (e) => {
     const { name, value } = e.target;
 
@@ -30,6 +33,9 @@ function Register() {
     }));
   };
 
+  // =========================
+  // Validate Form
+  // =========================
   const validateForm = () => {
     const newErrors = {};
 
@@ -39,14 +45,15 @@ function Register() {
 
     if (!formData.email.trim()) {
       newErrors.email = "Email is required";
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+    } else if (!/^\S+@\S+\.\S+$/.test(formData.email)) {
       newErrors.email = "Please enter a valid email";
     }
 
     if (!formData.password) {
       newErrors.password = "Password is required";
     } else if (formData.password.length < 6) {
-      newErrors.password = "Password must be at least 6 characters";
+      newErrors.password =
+        "Password must be at least 6 characters";
     }
 
     if (!formData.address.trim()) {
@@ -56,6 +63,9 @@ function Register() {
     return newErrors;
   };
 
+  // =========================
+  // Submit Registration
+  // =========================
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -66,18 +76,19 @@ function Register() {
       return;
     }
 
-    setLoading(true);
-    setErrors({});
-
     try {
-      // Send registration data to backend
+      setLoading(true);
+      setErrors({});
+
+      // Register user
       await authService.register(formData);
 
-      // Backend accepted registration
-      // User now needs to verify OTP
-      navigate("/verify-otp", {
+      // Registration successful
+      // Backend sends confirmation email
+      navigate("/login", {
         state: {
-          email: formData.email,
+          message:
+            "Account created successfully. Please check your email and confirm your email address before logging in.",
         },
       });
     } catch (error) {
@@ -86,6 +97,7 @@ function Register() {
       const message =
         error.response?.data?.message ||
         error.response?.data?.title ||
+        error.response?.data?.detail ||
         error.response?.data ||
         "Registration failed. Please try again.";
 
@@ -123,7 +135,10 @@ function Register() {
         )}
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="auth-form">
+        <form
+          onSubmit={handleSubmit}
+          className="auth-form"
+        >
 
           {/* Name */}
           <div className="form-group">
@@ -223,12 +238,12 @@ function Register() {
               ? "Creating Account..."
               : "Create Account"}
           </button>
-
         </form>
 
         {/* Login Link */}
         <p className="auth-footer">
           Already have an account?{" "}
+
           <Link to="/login">
             Login
           </Link>
